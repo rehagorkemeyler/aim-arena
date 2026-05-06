@@ -135,24 +135,28 @@ export function init() {
     initInputListeners();
   }
 
-  // Settings
-  $('sld-sens').addEventListener('input', function() {
-    cfg.sensitivity = parseFloat(this.value);
-    $('sens-val').textContent = cfg.sensitivity.toFixed(2);
-    controls.pointerSpeed = cfg.sensitivity;
-  });
-  $('chk-fs').addEventListener('change', function() {
-    if (this.checked) document.documentElement.requestFullscreen?.().catch(() => {});
-    else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
-  });
-  document.addEventListener('fullscreenchange', () => {
-    if (!document.fullscreenElement) $('chk-fs').checked = false;
-  });
+  // Settings (desktop-only elements — guard for mobile)
+  if ($('sld-sens')) {
+    $('sld-sens').addEventListener('input', function() {
+      cfg.sensitivity = parseFloat(this.value);
+      $('sens-val').textContent = cfg.sensitivity.toFixed(2);
+      controls.pointerSpeed = cfg.sensitivity;
+    });
+  }
+  if ($('chk-fs')) {
+    $('chk-fs').addEventListener('change', function() {
+      if (this.checked) document.documentElement.requestFullscreen?.().catch(() => {});
+      else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    });
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && $('chk-fs')) $('chk-fs').checked = false;
+    });
+  }
 
   // Buttons
   $('btn-start').onclick = () => startGame();
-  $('btn-cfg').onclick = () => showScreen($('cfg'));
-  $('btn-back').onclick = () => showScreen($('menu'));
+  if ($('btn-cfg'))  $('btn-cfg').onclick  = () => showScreen($('cfg'));
+  if ($('btn-back')) $('btn-back').onclick = () => showScreen($('menu'));
   $('btn-go-retry').onclick = () => startGame();
   $('btn-win-retry').onclick = () => startGame();
   $('btn-resume').onclick = () => {
@@ -190,7 +194,7 @@ export function init() {
 // ── SCREENS ──
 function showScreen(el) {
   [$('menu'),$('cfg'),$('go-screen'),$('win-screen'),$('pause-screen'),$('hud')]
-    .forEach(s => s.classList.add('hidden'));
+    .forEach(s => { if (s) s.classList.add('hidden'); });
   if (el) el.classList.remove('hidden');
 }
 
@@ -412,19 +416,21 @@ function damagePlayer(n) {
 
 // ── END SCREENS ──
 function showGameOver() {
-  controls.unlock();
+  if (!isMobile) controls.unlock();
+  else { gameActive = false; gameActiveRef.value = false; }
   playDefeatMusic();
-  $('go-acc').textContent = stats.shots > 0 ? Math.round(stats.hits / stats.shots * 100) + '%' : '0%';
-  $('go-kills').textContent = stats.kills;
+  if ($('go-acc'))   $('go-acc').textContent = stats.shots > 0 ? Math.round(stats.hits / stats.shots * 100) + '%' : '0%';
+  if ($('go-kills')) $('go-kills').textContent = stats.kills;
   $('vignette').classList.add('hidden');
   showScreen($('go-screen'));
 }
 
 function showVictory() {
-  controls.unlock();
+  if (!isMobile) controls.unlock();
+  else { gameActive = false; gameActiveRef.value = false; }
   playVictoryMusic();
-  $('win-acc').textContent = stats.shots > 0 ? Math.round(stats.hits / stats.shots * 100) + '%' : '0%';
-  $('win-kills').textContent = stats.kills;
+  if ($('win-acc'))   $('win-acc').textContent = stats.shots > 0 ? Math.round(stats.hits / stats.shots * 100) + '%' : '0%';
+  if ($('win-kills')) $('win-kills').textContent = stats.kills;
   $('vignette').classList.add('hidden');
   showScreen($('win-screen'));
 }
@@ -439,15 +445,15 @@ function updateHealthHUD() {
 }
 function updateWeaponHUD() {
   const a = player.ammo[player.weapon];
-  $('wpn-name').textContent = WPN[player.weapon].name;
-  $('h-cur').textContent = a.cur;
-  $('h-res').textContent = a.reserve;
+  if ($('wpn-name')) $('wpn-name').textContent = WPN[player.weapon].name;
+  if ($('h-cur'))    $('h-cur').textContent = a.cur;
+  if ($('h-res'))    $('h-res').textContent = a.reserve;
 }
 function updateAccHUD() {
   const p = stats.shots > 0 ? Math.round(stats.hits / stats.shots * 100) : 0;
-  $('h-acc').textContent = p + '%';
-  $('h-shots').textContent = stats.shots;
-  $('h-hits').textContent = stats.hits;
+  if ($('h-acc'))   $('h-acc').textContent = p + '%';
+  if ($('h-shots')) $('h-shots').textContent = stats.shots;
+  if ($('h-hits'))  $('h-hits').textContent = stats.hits;
 }
 function updateKillHUD() {
   $('h-enemies').textContent = enemies.filter(e => e.alive).length;
