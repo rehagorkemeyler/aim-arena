@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Tactical Aim Arena - Mobile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Oswald:wght@400;600;700&display=swap" rel="stylesheet"/>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.172.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.172.0/examples/jsm/"
+  }
+}
+</script>
+<link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="hit-flash"></div>
+<div id="vignette" class="hidden"></div>
+
+<!-- Mobile Touch Overlay -->
+<div id="mobile-overlay">
+  <!-- Joystick Area -->
+  <div id="joystick-zone">
+    <div id="joystick-base">
+      <div id="joystick-stick"></div>
+    </div>
+  </div>
+
+  <!-- Right Side Controls -->
+  <div id="touch-look-zone"></div>
+  
+  <div id="mobile-btns">
+    <div id="btn-fire" class="m-btn">FIRE</div>
+    <div id="btn-jump" class="m-btn">JUMP</div>
+    <div id="btn-reload-m" class="m-btn">RELOAD</div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="kill-streak-container">
+    <h1 id="kill-streak-text">DOUBLE KILL</h1>
+    <p id="kill-streak-sub">STREAK +2</p>
+  </div>
+  <div id="xhair"><div class="xhair-dot"></div></div>
+  <div id="hitmarker"><div class="hm-line"></div><div class="hm-line"></div><div class="hm-line"></div><div class="hm-line"></div></div>
+  
+  <div id="kill-feed"></div>
+  <div id="kills-box">HOSTILES <span id="h-enemies">20</span>/20</div>
+  
+  <div id="hp-wrap">
+    <div id="hp-bg"><div id="hp-bar"></div></div>
+    <div id="hp-val">100 HP</div>
+  </div>
+
+  <div id="wpn-wrap">
+    <div id="wpn-ammo"><span class="big" id="h-cur">30</span> / <span id="h-res">90</span></div>
+    <div id="wpn-reload"></div>
+  </div>
+</div>
+
+<!-- MAIN MENU -->
+<div id="menu" class="screen">
+  <h1 class="menu-title">⚔ Tactical Arena</h1>
+  <button class="btn btn-red" id="btn-start">▶ Start Mission</button>
+  <p class="hint">Tap to play</p>
+</div>
+
+<!-- GAME OVER -->
+<div id="go-screen" class="screen hidden">
+  <h1>☠ FAILED</h1>
+  <button class="btn btn-red" id="btn-go-retry">↺ Retry</button>
+</div>
+
+<!-- VICTORY -->
+<div id="win-screen" class="screen hidden">
+  <h1>★ VICTORY</h1>
+  <button class="btn btn-red" id="btn-win-retry">↺ Again</button>
+</div>
+
+<!-- PAUSE -->
+<div id="pause-screen" class="screen hidden">
+  <h1 class="menu-title">⏸ PAUSED</h1>
+  <button class="btn btn-red" id="btn-resume">▶ Continue</button>
+  <button class="btn btn-grey" id="btn-exit">⏹ Exit</button>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

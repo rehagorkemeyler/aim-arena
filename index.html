@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome - Tactical Aim Arena</title>
+    <script>
+        // Redirect mobile users directly to the mobile game page
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            window.location.href = "./game/mobile.html";
+        }
+    </script>
+    <style>
+        body {
+            background: #0a0a0a;
+            color: #e67e22;
+            font-family: 'Rajdhani', sans-serif;
+            text-align: center;
+            padding-top: 15%;
+            margin: 0;
+            overflow: hidden;
+        }
+        h1 {
+            font-size: 4rem;
+            letter-spacing: 10px;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 20px rgba(230,126,34,0.5);
+        }
+        .container {
+            border: 1px solid rgba(230,126,34,0.2);
+            display: inline-block;
+            padding: 40px 80px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            border-radius: 4px;
+        }
+        a {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            color: white;
+            padding: 20px 50px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: inline-block;
+        }
+        a:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(231,76,60,0.4);
+        }
+        p {
+            color: #666;
+            margin-top: 2rem;
+            letter-spacing: 2px;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>Tactical Aim Arena</h1>
+        <br><br>
+        <a href="./game/index.html">Enter Arena</a>
+        <p>FOR DESKTOP & MOBILE</p>
+    </div>
+</body>
+</html>

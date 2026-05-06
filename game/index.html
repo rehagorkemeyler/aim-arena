@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tactical Aim Arena - Desktop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Oswald:wght@400;600;700&display=swap" rel="stylesheet"/>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.172.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.172.0/examples/jsm/"
+  }
+}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#0a0a0a;overflow:hidden;font-family:'Rajdhani',sans-serif;color:#fff;user-select:none;}
+canvas{display:block;position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;}
+
+/* ── Screens ── */
+.screen{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:100;background:rgba(0,0,0,0.75);backdrop-filter:blur(12px);
+}
+.screen.hidden{display:none!important;}
+.screen h1{
+  font-family:'Oswald',sans-serif;font-size:3.2rem;font-weight:700;
+  letter-spacing:6px;text-transform:uppercase;margin-bottom:.2rem;
+}
+.screen h2{font-size:1rem;color:#888;margin-bottom:2.4rem;letter-spacing:3px;font-weight:400;}
+
+.btn{
+  padding:14px 48px;margin:7px;font-family:'Rajdhani',sans-serif;
+  font-size:1.05rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;
+  border:none;border-radius:4px;cursor:pointer;
+  transition:transform .12s,box-shadow .12s,filter .12s;outline:none;
+  position:relative;z-index:110;
+}
+.btn:hover{filter:brightness(1.2);transform:scale(1.04);box-shadow:0 4px 20px rgba(0,0,0,.5);}
+.btn:active{transform:scale(.96);}
+.btn-red{background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;}
+.btn-blue{background:linear-gradient(135deg,#2471a3,#3498db);color:#fff;}
+.btn-grey{background:linear-gradient(135deg,#444,#666);color:#ddd;}
+
+.srow{display:flex;align-items:center;gap:14px;margin:10px 0;font-size:.95rem;}
+.srow label{min-width:190px;text-align:right;color:#bbb;}
+input[type=range]{width:150px;accent-color:#e67e22;cursor:pointer;}
+input[type=checkbox]{width:19px;height:19px;accent-color:#e74c3c;cursor:pointer;}
+#sens-val{min-width:40px;color:#e67e22;font-weight:700;}
+
+/* ── HUD ── */
+#hud{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;}
+
+/* Crosshair */
+#xhair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:26px;height:26px;z-index:60;}
+#xhair::before,#xhair::after{content:'';position:absolute;background:rgba(0,255,68,.88);box-shadow:0 0 2px rgba(0,0,0,.8);}
+#xhair::before{width:20px;height:2px;top:12px;left:3px;}
+#xhair::after{width:2px;height:20px;top:3px;left:12px;}
+.xhair-dot{position:absolute;width:3px;height:3px;background:rgba(0,255,68,.9);border-radius:50%;top:11.5px;left:11.5px;}
+
+/* Hitmarker */
+#hitmarker{
+  position:absolute;top:50%;left:50%;width:20px;height:20px;
+  transform:translate(-50%,-50%);opacity:0;z-index:61;
+  transition:opacity .08s;pointer-events:none;
+}
+#hitmarker.show{opacity:1;}
+#hitmarker.headshot .hm-line{background:#e74c3c!important;}
+.hm-line{position:absolute;width:10px;height:2px;background:#fff;transform-origin:0 50%;}
+.hm-line:nth-child(1){top:3px;left:13px;transform:rotate(45deg);}
+.hm-line:nth-child(2){top:13px;left:15px;transform:rotate(135deg);}
+.hm-line:nth-child(3){top:15px;left:5px;transform:rotate(225deg);}
+.hm-line:nth-child(4){top:5px;left:3px;transform:rotate(315deg);}
+
+/* Accuracy / top bar */
+#acc-box{
+  position:absolute;top:14px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.08);
+  border-radius:4px;padding:5px 18px;font-size:.78rem;letter-spacing:2px;white-space:nowrap;
+}
+#acc-box span{color:#e67e22;font-weight:700;}
+
+/* Kill feed */
+#kill-feed{
+  position:absolute;top:50px;right:18px;display:flex;flex-direction:column;
+  gap:4px;align-items:flex-end;
+}
+.kf-entry{
+  background:rgba(0,0,0,.6);border-radius:3px;padding:3px 10px;
+  font-size:.72rem;letter-spacing:1px;color:#ccc;
+  animation:kfSlide .3s ease-out;white-space:nowrap;
+}
+.kf-entry .kf-hs{color:#e74c3c;font-weight:700;}
+.kf-entry .kf-wpn{color:#888;}
+@keyframes kfSlide{from{transform:translateX(40px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+
+/* Enemy counter */
+#kills-box{
+  position:absolute;top:14px;right:18px;
+  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.08);
+  border-radius:4px;padding:5px 14px;font-size:.78rem;letter-spacing:2px;
+}
+#kills-box span{color:#e74c3c;font-weight:700;}
+
+/* Health */
+#hp-wrap{position:absolute;bottom:22px;left:22px;width:200px;}
+#hp-label{font-size:.65rem;letter-spacing:2px;color:#999;margin-bottom:3px;text-transform:uppercase;}
+#hp-bg{width:100%;height:10px;background:rgba(255,255,255,.1);border-radius:5px;overflow:hidden;position:relative;}
+#hp-bar{height:100%;width:100%;background:linear-gradient(90deg,#e74c3c,#e67e22);border-radius:5px;transition:width .18s;}
+#hp-ticks{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;}
+#hp-ticks span{flex:1;border-right:1px solid rgba(0,0,0,.3);}
+#hp-ticks span:last-child{border:none;}
+#hp-val{font-size:.85rem;color:#e67e22;font-weight:700;margin-top:2px;}
+
+/* Weapon */
+#wpn-wrap{position:absolute;bottom:22px;right:22px;text-align:right;}
+#wpn-name{font-family:'Oswald',sans-serif;font-size:1.1rem;font-weight:600;letter-spacing:3px;color:#e67e22;}
+#wpn-ammo{font-size:.9rem;color:#bbb;margin-top:2px;}
+#wpn-ammo .big{color:#fff;font-weight:700;font-size:1.3rem;}
+#wpn-reload{font-size:.68rem;color:#e74c3c;margin-top:3px;min-height:13px;letter-spacing:1px;}
+
+/* Damage flash */
+#hit-flash{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:55;background:rgba(220,30,30,0);
+  transition:background .07s;
+}
+
+/* Damage direction */
+#dmg-dir{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:54;}
+.dmg-arc{
+  position:absolute;width:80px;height:80px;opacity:0;
+  transition:opacity .15s;
+}
+.dmg-arc.top{top:8%;left:50%;transform:translateX(-50%) rotate(0deg);}
+.dmg-arc.right{top:50%;right:8%;transform:translateY(-50%) rotate(90deg);}
+.dmg-arc.bottom{bottom:8%;left:50%;transform:translateX(-50%) rotate(180deg);}
+.dmg-arc.left{top:50%;left:8%;transform:translateY(-50%) rotate(270deg);}
+
+/* Vignette overlay */
+#vignette{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:52;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.45) 100%);
+}
+
+      #kill-streak-container { position:absolute; top:15%; left:0; width:100%; text-align:center; pointer-events:none; opacity:0; transform:scale(0.5); transition:all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+      #kill-streak-text { font-family:'Oswald',sans-serif; font-size:52px; font-weight:800; text-transform:uppercase; letter-spacing:4px; text-shadow:0 0 15px rgba(0,0,0,0.8), 2px 2px 0 #000; margin:0; line-height:1; }
+      #kill-streak-sub { font-family:'Rajdhani',sans-serif; font-size:24px; font-weight:600; color:#fff; text-shadow:0 0 10px rgba(0,0,0,0.8); margin:0; letter-spacing:2px; }
+      
+      .streak-active { opacity:1 !important; transform:scale(1) !important; }
+      .streak-pop { animation: streakPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+      .streak-shake { animation: streakShake 0.4s ease-in-out infinite alternate; }
+      
+      @keyframes streakPop { 0% { transform: scale(0.5); opacity:0; } 50% { transform: scale(1.2); } 100% { transform: scale(1); opacity:1; } }
+      @keyframes streakShake { 0% { transform: translate(1px, 1px) rotate(0deg); } 100% { transform: translate(-1px, -2px) rotate(-1deg); } }
+
+      .streak-1 { color: #ffffff; text-shadow: 0 0 20px rgba(255,255,255,0.8), 2px 2px 0 #000 !important; }
+      .streak-2 { color: #00d2ff; text-shadow: 0 0 20px rgba(0,210,255,0.8), 2px 2px 0 #000 !important; }
+      .streak-3 { color: #b829ff; text-shadow: 0 0 25px rgba(184,41,255,0.9), 2px 2px 0 #000 !important; }
+      .streak-4 { color: #ffaa00; text-shadow: 0 0 30px rgba(255,170,0,1), 2px 2px 0 #000 !important; font-size: 64px !important; }
+      .streak-5 { color: #ff0033; text-shadow: 0 0 40px rgba(255,0,51,1), 4px 4px 0 #000 !important; font-size: 80px !important; }
+
+/* End screens */
+.sline{font-size:.95rem;color:#aaa;margin-bottom:1.6rem;letter-spacing:2px;}
+.sline span{color:#e67e22;font-weight:700;}
+#go-screen h1{color:#e74c3c;text-shadow:0 0 30px rgba(231,76,60,.5);}
+#win-screen h1{color:#2ecc71;text-shadow:0 0 30px rgba(46,204,113,.5);}
+.hint{margin-top:22px;font-size:.68rem;color:#555;letter-spacing:2px;}
+
+/* Menu title */
+.menu-title{color:#e67e22;text-shadow:0 0 30px rgba(230,126,34,.4),0 2px 10px rgba(0,0,0,.8);}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="hit-flash"></div>
+<div id="vignette" class="hidden"></div>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div id="kill-streak-container">
+    <h1 id="kill-streak-text">DOUBLE KILL</h1>
+    <p id="kill-streak-sub">STREAK +2</p>
+  </div>
+  <div id="xhair"><div class="xhair-dot"></div></div>
+  <div id="hitmarker"><div class="hm-line"></div><div class="hm-line"></div><div class="hm-line"></div><div class="hm-line"></div></div>
+  <div id="acc-box">
+    ACC <span id="h-acc">0%</span> &nbsp;|&nbsp;
+    SHOTS <span id="h-shots">0</span> &nbsp;|&nbsp;
+    HITS <span id="h-hits">0</span>
+  </div>
+  <div id="kill-feed"></div>
+  <div id="kills-box">HOSTILES <span id="h-enemies">20</span>/20</div>
+  <div id="hp-wrap">
+    <div id="hp-label">Health</div>
+    <div id="hp-bg">
+      <div id="hp-bar"></div>
+      <div id="hp-ticks"><span></span><span></span><span></span><span></span></div>
+    </div>
+    <div id="hp-val">100 HP</div>
+  </div>
+  <div id="wpn-wrap">
+    <div id="wpn-name">AK-47</div>
+    <div id="wpn-ammo"><span class="big" id="h-cur">30</span> / <span id="h-res">90</span></div>
+    <div id="wpn-reload"></div>
+  </div>
+  <div id="dmg-dir"></div>
+</div>
+
+<!-- MAIN MENU -->
+<div id="menu" class="screen">
+  <h1 class="menu-title">⚔ Tactical Aim Arena</h1>
+  <h2>DESERT COMPOUND — ELIMINATE ALL HOSTILES</h2>
+  <button class="btn btn-red" id="btn-start">▶ Start Mission</button>
+  <button class="btn btn-blue" id="btn-cfg">⚙ Settings</button>
+  <p class="hint">WASD · SPACE · LMB · R · Keys 1/2 · ESC to pause</p>
+</div>
+
+<!-- SETTINGS -->
+<div id="cfg" class="screen hidden">
+  <h1 class="menu-title">Settings</h1>
+  <div class="srow">
+    <label for="chk-fs">Fullscreen Mode</label>
+    <input type="checkbox" id="chk-fs"/>
+  </div>
+  <div class="srow">
+    <label for="sld-sens">Mouse Sensitivity</label>
+    <input type="range" id="sld-sens" min="0.1" max="3" step="0.05" value="1"/>
+    <span id="sens-val">1.00</span>
+  </div>
+  <button class="btn btn-grey" id="btn-back">← Back</button>
+</div>
+
+<!-- GAME OVER -->
+<div id="go-screen" class="screen hidden">
+  <h1>☠ MISSION FAILED</h1>
+  <p class="sline">You were eliminated.</p>
+  <p class="sline">Accuracy: <span id="go-acc">0%</span> &nbsp;|&nbsp; Kills: <span id="go-kills">0</span></p>
+  <button class="btn btn-red" id="btn-go-retry">↺ Retry Mission</button>
+</div>
+
+<!-- VICTORY -->
+<div id="win-screen" class="screen hidden">
+  <h1>★ MISSION COMPLETE</h1>
+  <p class="sline">All hostiles neutralized.</p>
+  <p class="sline">Accuracy: <span id="win-acc">0%</span> &nbsp;|&nbsp; Kills: <span id="win-kills">20</span></p>
+  <button class="btn btn-red" id="btn-win-retry">↺ Next Mission</button>
+</div>
+
+<!-- PAUSE -->
+<div id="pause-screen" class="screen hidden">
+  <h1 class="menu-title">⏸ PAUSED</h1>
+  <h2>Take a breath, soldier.</h2>
+  <button class="btn btn-red" id="btn-resume">▶ Continue</button>
+  <button class="btn btn-grey" id="btn-exit">⏹ Abort Mission</button>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
