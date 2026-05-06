@@ -253,6 +253,15 @@ function startGame() {
   else {
     gameActive = true;
     gameActiveRef.value = true;
+    
+    // Request fullscreen and horizontal orientation
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().then(() => {
+        if (screen.orientation && screen.orientation.lock) {
+          screen.orientation.lock('landscape').catch((e) => console.log('Orientation lock failed:', e));
+        }
+      }).catch(e => console.log('Fullscreen failed:', e));
+    }
   }
 }
 

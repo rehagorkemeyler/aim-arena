@@ -3,7 +3,14 @@
 <head>
     <title>Welcome - Tactical Aim Arena</title>
     <script>
-        // Redirect mobile users directly to the mobile game page
+        function checkMobile(e) {
+            if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                e.preventDefault();
+                window.location.href = "./game/mobile.html";
+            }
+        }
+        
+        // Also run on load just in case
         if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
             window.location.href = "./game/mobile.html";
         }
@@ -62,7 +69,7 @@
     <div class="container">
         <h1>Tactical Aim Arena</h1>
         <br><br>
-        <a href="./game/index.html">Enter Arena</a>
+        <a href="./game/index.html" onclick="checkMobile(event)">Enter Arena</a>
         <p>FOR DESKTOP & MOBILE</p>
     </div>
 </body>

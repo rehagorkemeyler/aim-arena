@@ -56,24 +56,27 @@ export function initMobileInputs(callbacks) {
     keys.w = keys.s = keys.a = keys.d = false;
   });
 
-  // Touch Look
+  let lookTouchId = null;
+
   lookZone.addEventListener('touchstart', e => {
-    // Find the touch that is NOT in the joystick zone if multiple touches
-    for (let i = 0; i < e.touches.length; i++) {
-      const t = e.touches[i];
-      if (t.clientX > window.innerWidth / 2) {
+    e.preventDefault();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (!lookActive) {
+        const t = e.changedTouches[i];
         lookActive = true;
+        lookTouchId = t.identifier;
         lastLookPos = { x: t.clientX, y: t.clientY };
         break;
       }
     }
-  });
+  }, { passive: false });
 
   lookZone.addEventListener('touchmove', e => {
+    e.preventDefault();
     if (!lookActive) return;
-    for (let i = 0; i < e.touches.length; i++) {
-      const t = e.touches[i];
-      if (t.clientX > window.innerWidth / 2) {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const t = e.changedTouches[i];
+      if (t.identifier === lookTouchId) {
         const dx = t.clientX - lastLookPos.x;
         const dy = t.clientY - lastLookPos.y;
         
@@ -86,8 +89,14 @@ export function initMobileInputs(callbacks) {
     }
   }, { passive: false });
 
-  lookZone.addEventListener('touchend', () => {
-    lookActive = false;
+  lookZone.addEventListener('touchend', e => {
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      if (e.changedTouches[i].identifier === lookTouchId) {
+        lookActive = false;
+        lookTouchId = null;
+        break;
+      }
+    }
   });
 
   // Buttons
