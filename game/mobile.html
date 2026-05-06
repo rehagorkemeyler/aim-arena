@@ -31,14 +31,24 @@
     </div>
   </div>
 
-  <!-- Right Side Controls -->
+  <!-- Crouch button — left side near joystick -->
+  <div id="btn-crouch" class="m-btn m-btn-left">CROUCH</div>
+
+  <!-- Right Side Look Zone -->
   <div id="touch-look-zone"></div>
   
+  <!-- Right Side Action Buttons -->
   <div id="mobile-btns">
     <div id="btn-fire" class="m-btn">FIRE</div>
     <div id="btn-jump" class="m-btn">JUMP</div>
     <div id="btn-reload-m" class="m-btn">RELOAD</div>
   </div>
+
+  <!-- Pause Button — top center -->
+  <div id="btn-pause-m" class="m-btn-sm">⏸</div>
+
+  <!-- Weapon Switch Button — left side above joystick -->
+  <div id="btn-wpn-switch" class="m-btn-sm">🔄 AK-47</div>
 </div>
 
 <!-- HUD -->
@@ -50,44 +60,74 @@
   <div id="xhair"><div class="xhair-dot"></div></div>
   <div id="hitmarker"><div class="hm-line"></div><div class="hm-line"></div><div class="hm-line"></div><div class="hm-line"></div></div>
   
+  <div id="acc-box">
+    ACC <span id="h-acc">0%</span> &nbsp;|&nbsp;
+    SHOTS <span id="h-shots">0</span> &nbsp;|&nbsp;
+    HITS <span id="h-hits">0</span>
+  </div>
+
   <div id="kill-feed"></div>
   <div id="kills-box">HOSTILES <span id="h-enemies">20</span>/20</div>
   
   <div id="hp-wrap">
-    <div id="hp-bg"><div id="hp-bar"></div></div>
+    <div id="hp-label">Health</div>
+    <div id="hp-bg">
+      <div id="hp-bar"></div>
+      <div id="hp-ticks"><span></span><span></span><span></span><span></span></div>
+    </div>
     <div id="hp-val">100 HP</div>
   </div>
 
   <div id="wpn-wrap">
+    <div id="wpn-name">AK-47</div>
     <div id="wpn-ammo"><span class="big" id="h-cur">30</span> / <span id="h-res">90</span></div>
     <div id="wpn-reload"></div>
   </div>
+  <div id="dmg-dir"></div>
 </div>
 
 <!-- MAIN MENU -->
 <div id="menu" class="screen">
   <h1 class="menu-title">⚔ Tactical Arena</h1>
+  <h2>DESERT COMPOUND — ELIMINATE ALL HOSTILES</h2>
   <button class="btn btn-red" id="btn-start">▶ Start Mission</button>
+  <button class="btn btn-blue" id="btn-cfg">⚙ Settings</button>
   <p class="hint">Tap to play</p>
+</div>
+
+<!-- SETTINGS -->
+<div id="cfg" class="screen hidden">
+  <h1 class="menu-title">Settings</h1>
+  <div class="srow">
+    <label for="sld-sens">Look Sensitivity</label>
+    <input type="range" id="sld-sens" min="0.1" max="3" step="0.05" value="1"/>
+    <span id="sens-val">1.00</span>
+  </div>
+  <button class="btn btn-grey" id="btn-back">← Back</button>
 </div>
 
 <!-- GAME OVER -->
 <div id="go-screen" class="screen hidden">
-  <h1>☠ FAILED</h1>
-  <button class="btn btn-red" id="btn-go-retry">↺ Retry</button>
+  <h1>☠ MISSION FAILED</h1>
+  <p class="sline">You were eliminated.</p>
+  <p class="sline">Accuracy: <span id="go-acc">0%</span> &nbsp;|&nbsp; Kills: <span id="go-kills">0</span></p>
+  <button class="btn btn-red" id="btn-go-retry">↺ Retry Mission</button>
 </div>
 
 <!-- VICTORY -->
 <div id="win-screen" class="screen hidden">
-  <h1>★ VICTORY</h1>
-  <button class="btn btn-red" id="btn-win-retry">↺ Again</button>
+  <h1>★ MISSION COMPLETE</h1>
+  <p class="sline">All hostiles neutralized.</p>
+  <p class="sline">Accuracy: <span id="win-acc">0%</span> &nbsp;|&nbsp; Kills: <span id="win-kills">20</span></p>
+  <button class="btn btn-red" id="btn-win-retry">↺ Next Mission</button>
 </div>
 
 <!-- PAUSE -->
 <div id="pause-screen" class="screen hidden">
   <h1 class="menu-title">⏸ PAUSED</h1>
+  <h2>Take a breath, soldier.</h2>
   <button class="btn btn-red" id="btn-resume">▶ Continue</button>
-  <button class="btn btn-grey" id="btn-exit">⏹ Exit</button>
+  <button class="btn btn-grey" id="btn-exit">⏹ Abort Mission</button>
 </div>
 
 <script type="module" src="js/main.js"></script>

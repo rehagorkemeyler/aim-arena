@@ -16,7 +16,7 @@ import { keys, player, stats, cfg, WPN, setInputCallbacks, initInputListeners,
          PLAYER_SPEED, PLAYER_HEIGHT, CROUCH_HEIGHT, SLIDE_SPEED, SLIDE_DUR, JUMP_VEL,
          GRAVITY, PLAYER_RADIUS, ENEMY_TOTAL, ENEMY_SPEED, ENEMY_SIGHT, ENEMY_ATK_RNG,
          ENEMY_ATK_RT, ENEMY_DMG, ENEMY_HIT_MOVING, ENEMY_HIT_STATIONARY, BODY_DMG, HEAD_DMG } from './input.js';
-import { initMobileInputs, mobileLookDelta } from './mobileInput.js';
+import { initMobileInputs, mobileLookDelta, mobileCfg } from './mobileInput.js';
 
 const $ = id => document.getElementById(id);
 
@@ -122,7 +122,10 @@ export function init() {
     initMobileInputs({
       shoot: tryShoot,
       reload: startReload,
-      jump: doJump
+      jump: doJump,
+      crouch: toggleCrouchMobile,
+      weaponSwitch: toggleWeaponMobile,
+      pause: pauseGameMobile
     });
   } else {
     setInputCallbacks({
@@ -135,12 +138,16 @@ export function init() {
     initInputListeners();
   }
 
-  // Settings (desktop-only elements — guard for mobile)
+  // Settings
   if ($('sld-sens')) {
     $('sld-sens').addEventListener('input', function() {
       cfg.sensitivity = parseFloat(this.value);
       $('sens-val').textContent = cfg.sensitivity.toFixed(2);
-      controls.pointerSpeed = cfg.sensitivity;
+      if (isMobile) {
+        mobileCfg.lookSpeed = 0.005 * cfg.sensitivity;
+      } else {
+        controls.pointerSpeed = cfg.sensitivity;
+      }
     });
   }
   if ($('chk-fs')) {
@@ -153,25 +160,33 @@ export function init() {
     });
   }
 
-  // Buttons
-  $('btn-start').onclick = () => startGame();
-  if ($('btn-cfg'))  $('btn-cfg').onclick  = () => showScreen($('cfg'));
-  if ($('btn-back')) $('btn-back').onclick = () => showScreen($('menu'));
-  $('btn-go-retry').onclick = () => startGame();
-  $('btn-win-retry').onclick = () => startGame();
-  $('btn-resume').onclick = () => {
+  // Buttons — use both touchstart and click so mobile Chrome works
+  function bindBtn(id, handler) {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); handler(); }, { passive: false });
+    el.addEventListener('click', e => { e.stopPropagation(); handler(); });
+  }
+
+  bindBtn('btn-start', () => startGame());
+  bindBtn('btn-cfg',   () => showScreen($('cfg')));
+  bindBtn('btn-back',  () => showScreen($('menu')));
+  bindBtn('btn-go-retry',  () => startGame());
+  bindBtn('btn-win-retry', () => startGame());
+  bindBtn('btn-resume', () => {
     showScreen($('hud'));
     $('vignette').classList.remove('hidden');
+    if (isMobile && $('mobile-overlay')) $('mobile-overlay').style.display = '';
     playCombatMusic();
     if (!isMobile) controls.lock();
-    else gameActive = true;
-  };
-  $('btn-exit').onclick = () => {
+    else { gameActive = true; gameActiveRef.value = true; }
+  });
+  bindBtn('btn-exit', () => {
     resetGame();
     showScreen($('menu'));
     $('vignette').classList.add('hidden');
     playMenuMusic();
-  };
+  });
 
   // Resize
   window.addEventListener('resize', () => {
@@ -196,6 +211,13 @@ function showScreen(el) {
   [$('menu'),$('cfg'),$('go-screen'),$('win-screen'),$('pause-screen'),$('hud')]
     .forEach(s => { if (s) s.classList.add('hidden'); });
   if (el) el.classList.remove('hidden');
+
+  // On mobile, hide the touch overlay when any menu/overlay screen is active
+  // so it can't steal touch events from buttons
+  if (isMobile && $('mobile-overlay')) {
+    const isGameHUD = (el === $('hud'));
+    $('mobile-overlay').style.display = isGameHUD ? '' : 'none';
+  }
 }
 
 // ── GAME START/RESET ──
@@ -402,6 +424,39 @@ function doJump() {
     player.onGround = false;
     player.isSliding = false;
   }
+}
+
+// ── MOBILE: CROUCH TOGGLE ──
+function toggleCrouchMobile() {
+  keys.crouch = !keys.crouch;
+  player.isCrouching = keys.crouch;
+  if (keys.crouch && player.onGround && (keys.w || keys.a || keys.s || keys.d)) {
+    player.isSliding = true;
+    player.slideTimer = SLIDE_DUR;
+    if (player.slideDir) {
+      player.slideDir.set(player.vel.x, 0, player.vel.z);
+      if (player.slideDir.lengthSq() > 0) player.slideDir.normalize();
+    }
+  }
+  const crouchBtn = $('btn-crouch');
+  if (crouchBtn) crouchBtn.classList.toggle('m-btn-active', keys.crouch);
+}
+
+// ── MOBILE: WEAPON SWITCH ──
+function toggleWeaponMobile() {
+  const next = player.weapon === 'ak47' ? 'pistol' : 'ak47';
+  switchWeapon(next);
+  const wpnBtn = $('btn-wpn-switch');
+  if (wpnBtn) wpnBtn.textContent = '🔄 ' + WPN[next].name;
+}
+
+// ── MOBILE: PAUSE ──
+function pauseGameMobile() {
+  if (!gameActive) return;
+  gameActive = false;
+  gameActiveRef.value = false;
+  pauseCombatMusic();
+  showScreen($('pause-screen'));
 }
 
 // ── PLAYER DAMAGE ──

@@ -7,15 +7,22 @@ let lastLookPos = { x: 0, y: 0 };
 
 export const mobileLookDelta = { x: 0, y: 0 };
 export const mobileFlags = { isMobile: true };
+export const mobileCfg = { lookSpeed: 0.005 };
 
 let onShoot = null;
 let onReload = null;
 let onJump = null;
+let onCrouch = null;
+let onWeaponSwitch = null;
+let onPause = null;
 
 export function initMobileInputs(callbacks) {
   onShoot = callbacks.shoot;
   onReload = callbacks.reload;
   onJump = callbacks.jump;
+  onCrouch = callbacks.crouch || null;
+  onWeaponSwitch = callbacks.weaponSwitch || null;
+  onPause = callbacks.pause || null;
 
   const joyZone = document.getElementById('joystick-zone');
   const stick = document.getElementById('joystick-stick');
@@ -80,8 +87,8 @@ export function initMobileInputs(callbacks) {
         const dx = t.clientX - lastLookPos.x;
         const dy = t.clientY - lastLookPos.y;
         
-        mobileLookDelta.x += dx * 0.005; // Sensitivity
-        mobileLookDelta.y += dy * 0.005;
+        mobileLookDelta.x += dx * mobileCfg.lookSpeed;
+        mobileLookDelta.y += dy * mobileCfg.lookSpeed;
         
         lastLookPos = { x: t.clientX, y: t.clientY };
         break;
@@ -99,7 +106,9 @@ export function initMobileInputs(callbacks) {
     }
   });
 
-  // Buttons
+  // ── Action Buttons ──
+
+  // Fire (hold for auto-fire)
   document.getElementById('btn-fire').addEventListener('touchstart', (e) => {
     e.preventDefault();
     player.mouseHeld = true;
@@ -109,13 +118,45 @@ export function initMobileInputs(callbacks) {
     player.mouseHeld = false;
   });
 
+  // Jump
   document.getElementById('btn-jump').addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (onJump) onJump();
   });
 
+  // Reload
   document.getElementById('btn-reload-m').addEventListener('touchstart', (e) => {
     e.preventDefault();
     if (onReload) onReload();
   });
+
+  // Crouch (toggle)
+  const crouchBtn = document.getElementById('btn-crouch');
+  if (crouchBtn) {
+    crouchBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onCrouch) onCrouch();
+    });
+  }
+
+  // Weapon Switch
+  const wpnBtn = document.getElementById('btn-wpn-switch');
+  if (wpnBtn) {
+    wpnBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onWeaponSwitch) onWeaponSwitch();
+    });
+  }
+
+  // Pause
+  const pauseBtn = document.getElementById('btn-pause-m');
+  if (pauseBtn) {
+    pauseBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (onPause) onPause();
+    });
+  }
 }
