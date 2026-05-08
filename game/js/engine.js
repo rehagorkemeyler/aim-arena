@@ -29,6 +29,20 @@ let dustPts = null;
 let vfx = null;
 let postfx = null;
 
+// Level configurations (placeholder themes for 10 levels)
+const LEVEL_CONFIG = [
+  { level: 1, theme: 'desert' },
+  { level: 2, theme: 'desert' },
+  { level: 3, theme: 'desert' },
+  { level: 4, theme: 'desert' },
+  { level: 5, theme: 'desert' },
+  { level: 6, theme: 'desert' },
+  { level: 7, theme: 'desert' },
+  { level: 8, theme: 'desert' },
+  { level: 9, theme: 'desert' },
+  { level: 10, theme: 'desert' },
+];
+
 // Recoil
 let recoilTarget = 0, recoilApplied = 0;
 const _rcEuler = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -88,9 +102,9 @@ export function init() {
   fill.position.set(-15, 20, -15);
   scene.add(fill);
 
-  // Build map
+  // Build map (default theme for level 1)
   collidables = [];
-  buildMap(scene, collidables);
+  buildMap(scene, collidables, LEVEL_CONFIG[0].theme);
   dustPts = buildDustParticles(scene);
 
   // VFX
@@ -741,7 +755,8 @@ function loop() {
 
   // Death animations
   for (let i = dyingEnemies.length - 1; i >= 0; i--) {
-    if (animateDeath(dyingEnemies[i], dt)) {
+    // Pass the current scene to animateDeath so it can remove the mesh
+    if (animateDeath(dyingEnemies[i], dt, scene)) {
       dyingEnemies.splice(i, 1);
     }
   }

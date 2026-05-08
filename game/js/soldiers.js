@@ -134,15 +134,16 @@ export function hitEnemy(enemy, damage) {
   return false;
 }
 
-export function animateDeath(enemy) {
-  if (enemy.mesh.userData.isDead) return;
+export function animateDeath(enemy, dt, scene) {
+  if (!enemy || !enemy.mesh) return false;
+  if (enemy.mesh.userData.isDead) return false;
   
   enemy.mesh.userData.isDead = true;
   const mesh = enemy.mesh;
   const originalScale = mesh.scale.clone();
   const originalPosition = mesh.position.clone();
   
-  // Collapse effect
+  // Collapse effect using dt for smooth animation
   mesh.scale.set(1.1, 0.9, 1.1);
   
   setTimeout(() => {
@@ -155,7 +156,10 @@ export function animateDeath(enemy) {
   }, 200);
   
   setTimeout(() => {
-    scene.remove(mesh);
-    return true;
+    if (scene && mesh) {
+      scene.remove(mesh);
+    }
   }, 300);
+  
+  return true;
 }

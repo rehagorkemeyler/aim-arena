@@ -186,7 +186,9 @@ export function updateDust(dustPts, dt) {
   pos.needsUpdate = true;
 }
 
-export function buildMap(scene, collidables) {
+export function buildMap(scene, collidables, theme = 'desert') {
+  // Theme parameter can be used to switch textures/materials per level
+  // Currently placeholder – future implementation can load different texture sets based on `theme`
   ensureMaterials();
 
   // Sky
