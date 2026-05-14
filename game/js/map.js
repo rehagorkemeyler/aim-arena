@@ -1,31 +1,10 @@
 // ─────────────────────────────────────────────────────────────
-// MAP BUILDER — Desert Compound Environment
+// MAP BUILDER — Theme-aware arena with pickups
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
-import { makeSandTextures, makeBrickTextures, makeConcreteTextures, makeMetalTextures, makeWoodTextures, makePBR } from './textures.js';
+import { getThemeMaterials } from './textures.js';
 
-let sandMat, brickMat, concreteMat, metalMat, woodMat;
-let texturesReady = false;
-
-function ensureMaterials() {
-  if (texturesReady) return;
-  const sand = makeSandTextures(512);
-  sand.albedo.repeat.set(8, 8); sand.normal.repeat.set(8, 8); sand.roughness.repeat.set(8, 8);
-  sandMat = makePBR(sand, { roughness: 0.95 });
-
-  const brick = makeBrickTextures(512);
-  brickMat = makePBR(brick, { roughness: 0.85 });
-
-  const conc = makeConcreteTextures(512);
-  concreteMat = makePBR(conc, { roughness: 0.8 });
-
-  metalMat = new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.5, metalness: 0.2 });
-
-  const wood = makeWoodTextures(256);
-  woodMat = makePBR(wood, { roughness: 0.75 });
-
-  texturesReady = true;
-}
+let currentThemeMats = null;
 
 function mkBox(scene, w, h, d, mat, x, y, z, shadow = true) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -62,6 +41,7 @@ function mkLadder(scene, collidables, w, h, x, y, z, rotY) {
   grp.rotation.y = rotY;
   scene.add(grp);
 
+  const metalMat = currentThemeMats.metal;
   function p(bw, bh, bd, bx, by, bz) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(bw, bh, bd), metalMat);
     m.position.set(bx, by, bz);
@@ -77,53 +57,19 @@ function mkLadder(scene, collidables, w, h, x, y, z, rotY) {
   }
 }
 
-// Sandbag barrier
-function mkSandbags(scene, collidables, x, y, z, w, h, d) {
-  const grp = new THREE.Group();
-  grp.position.set(x, y, z);
-  scene.add(grp);
-
-  const bagMat = new THREE.MeshStandardMaterial({ color: 0x8B7D5B, roughness: 0.95 });
-  const bagW = Math.min(1.2, w / 3), bagH = 0.35, bagD = Math.min(0.6, d);
-  const rows = Math.ceil(h / bagH);
-  const cols = Math.ceil(w / bagW);
-
-  for (let r = 0; r < rows; r++) {
-    const offset = (r % 2) * bagW * 0.3;
-    for (let c = 0; c < cols; c++) {
-      const bx = -w / 2 + c * bagW + bagW / 2 + offset;
-      const by = -h / 2 + r * bagH + bagH / 2;
-      const bag = new THREE.Mesh(
-        new THREE.BoxGeometry(bagW * 0.92, bagH * 0.85, bagD * 0.9),
-        bagMat
-      );
-      bag.position.set(bx, by, 0);
-      bag.rotation.z = (Math.random() - 0.5) * 0.06;
-      bag.castShadow = true;
-      bag.receiveShadow = true;
-      grp.add(bag);
-    }
-  }
-
-  // Collision box
-  const col = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshBasicMaterial({ visible: false })
-  );
-  col.position.set(x, y, z);
-  col.geometry.computeBoundingBox();
-  col.userData.aabb = new THREE.Box3().setFromObject(col);
-  collidables.push(col);
-  scene.add(col);
-}
-
-// Desert skybox (procedural gradient)
-function buildSky(scene) {
+// Sky dome with theme colors
+function buildSky(scene, theme) {
+  const t = currentThemeMats;
   const skyGeo = new THREE.SphereGeometry(95, 32, 16);
   const skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
-    uniforms: {},
+    uniforms: {
+      uSkyTop:  { value: new THREE.Vector3(...t.skyTop) },
+      uSkyMid:  { value: new THREE.Vector3(...t.skyMid) },
+      uHorizon: { value: new THREE.Vector3(...t.horizon) },
+      uSunTint: { value: new THREE.Vector3(...t.sunTint) },
+    },
     vertexShader: `
       varying vec3 vPos;
       void main() {
@@ -132,22 +78,19 @@ function buildSky(scene) {
       }
     `,
     fragmentShader: `
+      uniform vec3 uSkyTop, uSkyMid, uHorizon, uSunTint;
       varying vec3 vPos;
       void main() {
         float h = normalize(vPos).y;
-        vec3 skyTop = vec3(0.35, 0.55, 0.85);
-        vec3 skyMid = vec3(0.65, 0.75, 0.88);
-        vec3 horizon = vec3(0.85, 0.78, 0.60);
         vec3 col;
         if (h > 0.0) {
-          col = mix(horizon, skyMid, smoothstep(0.0, 0.15, h));
-          col = mix(col, skyTop, smoothstep(0.15, 0.6, h));
+          col = mix(uHorizon, uSkyMid, smoothstep(0.0, 0.15, h));
+          col = mix(col, uSkyTop, smoothstep(0.15, 0.6, h));
         } else {
-          col = horizon * 0.7;
+          col = uHorizon * 0.7;
         }
-        // Sun glow
         float sun = max(0.0, dot(normalize(vPos), normalize(vec3(20.0, 35.0, 20.0))));
-        col += vec3(1.0, 0.9, 0.6) * pow(sun, 32.0) * 0.6;
+        col += uSunTint * pow(sun, 32.0) * 0.6;
         gl_FragColor = vec4(col, 1.0);
       }
     `
@@ -155,8 +98,100 @@ function buildSky(scene) {
   scene.add(new THREE.Mesh(skyGeo, skyMat));
 }
 
+// ── Health Pack (spinning heart at X=-39) ──
+let healthPack = null;
+// ── Ammo Pack (glowing battery at X=39) ──
+let ammoPack = null;
+
+function buildPickups(scene) {
+  // Health — spinning heart shape (two spheres + cone)
+  const hpGroup = new THREE.Group();
+  const heartMat = new THREE.MeshStandardMaterial({
+    color: 0xff4466, emissive: 0xff2244, emissiveIntensity: 0.4, roughness: 0.3
+  });
+  const s1 = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), heartMat);
+  s1.position.set(-0.22, 0.15, 0);
+  hpGroup.add(s1);
+  const s2 = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), heartMat);
+  s2.position.set(0.22, 0.15, 0);
+  hpGroup.add(s2);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.52, 0.7, 12), heartMat);
+  cone.position.set(0, -0.25, 0);
+  cone.rotation.z = Math.PI;
+  hpGroup.add(cone);
+  // Cross overlay
+  const crossMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6 });
+  const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.12), crossMat);
+  crossH.position.set(0, 0.05, 0.35);
+  hpGroup.add(crossH);
+  const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.12), crossMat);
+  crossV.position.set(0, 0.05, 0.35);
+  hpGroup.add(crossV);
+
+  hpGroup.position.set(-37, 1.5, 0);
+  hpGroup.userData.isPickup = 'health';
+  scene.add(hpGroup);
+  healthPack = hpGroup;
+
+  // Ammo — glowing battery
+  const ammoGroup = new THREE.Group();
+  const batteryMat = new THREE.MeshStandardMaterial({
+    color: 0x44ccff, emissive: 0x2288ff, emissiveIntensity: 0.5, roughness: 0.2, metalness: 0.5
+  });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.8, 0.3), batteryMat);
+  ammoGroup.add(body);
+  const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.15, 8), batteryMat);
+  tip.position.y = 0.475;
+  ammoGroup.add(tip);
+  // Lightning bolt
+  const boltMat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.8 });
+  const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.4, 0.08), boltMat);
+  bolt.position.set(0, 0, 0.18);
+  ammoGroup.add(bolt);
+
+  ammoGroup.position.set(37, 1.5, 0);
+  ammoGroup.userData.isPickup = 'ammo';
+  scene.add(ammoGroup);
+  ammoPack = ammoGroup;
+}
+
+export function updatePickups(dt) {
+  const t = Date.now() * 0.002;
+  if (healthPack) {
+    healthPack.rotation.y += dt * 2;
+    healthPack.position.y = 1.5 + Math.sin(t) * 0.3;
+  }
+  if (ammoPack) {
+    ammoPack.rotation.y -= dt * 2;
+    ammoPack.position.y = 1.5 + Math.sin(t + 1) * 0.3;
+  }
+}
+
+export function checkPickup(playerPos, playerHP, playerAmmo) {
+  let picked = null;
+  if (healthPack && healthPack.visible !== false) {
+    const d = playerPos.distanceTo(healthPack.position);
+    if (d < 2.5 && playerHP < 100) { picked = 'health'; }
+  }
+  if (ammoPack && ammoPack.visible !== false) {
+    const d = playerPos.distanceTo(ammoPack.position);
+    if (d < 2.5) { picked = picked || 'ammo'; }
+  }
+  return picked;
+}
+
+export function hidePickup(type) {
+  if (type === 'health' && healthPack) healthPack.visible = false;
+  if (type === 'ammo' && ammoPack) ammoPack.visible = false;
+}
+
+export function resetPickups() {
+  if (healthPack) healthPack.visible = true;
+  if (ammoPack) ammoPack.visible = true;
+}
+
 // Ambient floating dust
-export function buildDustParticles(scene) {
+export function buildDustParticles(scene, theme) {
   const count = 300;
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(count * 3);
@@ -166,8 +201,10 @@ export function buildDustParticles(scene) {
     pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const t = getThemeMaterials(theme);
+  const dustColor = (theme === 'inferno') ? 0xb8a878 : 0xd4c49a;
   const mat = new THREE.PointsMaterial({
-    color: 0xd4c49a, size: 0.08, transparent: true, opacity: 0.4,
+    color: dustColor, size: 0.08, transparent: true, opacity: 0.4,
     depthWrite: false, sizeAttenuation: true
   });
   const pts = new THREE.Points(geo, mat);
@@ -187,61 +224,54 @@ export function updateDust(dustPts, dt) {
 }
 
 export function buildMap(scene, collidables, theme = 'desert') {
-  // Theme parameter can be used to switch textures/materials per level
-  // Currently placeholder – future implementation can load different texture sets based on `theme`
-  ensureMaterials();
+  currentThemeMats = getThemeMaterials(theme);
+  const t = currentThemeMats;
 
   // Sky
-  buildSky(scene);
+  buildSky(scene, theme);
 
-  // Ground — sand textured
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(80, 80, 1, 1),
-    sandMat
-  );
+  // Fog
+  scene.fog = new THREE.FogExp2(t.fog, 0.012);
+
+  // Ground
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80, 1, 1), t.ground);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   scene.add(ground);
 
-  // Outer walls — brick
-  const brickWall = (w, h, d, x, y, z) => {
-    const m = mkWall(scene, collidables, w, h, d, brickMat, x, y, z);
-    // Tile the brick texture relative to wall size
-    return m;
-  };
-  brickWall(77, 8, 1.5, 0, 4, -40);
-  brickWall(77, 8, 1.5, 0, 4, 40);
-  brickWall(1.5, 8, 80, -40, 4, 0);
-  brickWall(1.5, 8, 80, 40, 4, 0);
+  // Outer walls
+  mkWall(scene, collidables, 77, 8, 1.5, t.wall, 0, 4, -40);
+  mkWall(scene, collidables, 77, 8, 1.5, t.wall, 0, 4, 40);
+  mkWall(scene, collidables, 1.5, 8, 80, t.wall, -40, 4, 0);
+  mkWall(scene, collidables, 1.5, 8, 80, t.wall, 40, 4, 0);
 
-  // Wall top ledge (concrete lip)
-  mkBox(scene, 78, 0.4, 2.2, concreteMat, 0, 8.2, -40, true);
-  mkBox(scene, 78, 0.4, 2.2, concreteMat, 0, 8.2, 40, true);
-  mkBox(scene, 2.2, 0.4, 80, concreteMat, -40, 8.2, 0, true);
-  mkBox(scene, 2.2, 0.4, 80, concreteMat, 40, 8.2, 0, true);
+  // Wall top ledge
+  mkBox(scene, 78, 0.4, 2.2, t.cover, 0, 8.2, -40, true);
+  mkBox(scene, 78, 0.4, 2.2, t.cover, 0, 8.2, 40, true);
+  mkBox(scene, 2.2, 0.4, 80, t.cover, -40, 8.2, 0, true);
+  mkBox(scene, 2.2, 0.4, 80, t.cover, 40, 8.2, 0, true);
 
-  // ── Central Tower — concrete + metal ──
-  mkWall(scene, collidables, 10, 7, 10, concreteMat, 0, 3.5, 0);
+  // Central Tower
+  mkWall(scene, collidables, 10, 7, 10, t.cover, 0, 3.5, 0);
 
-  // Tower parapets — concrete
-  const pm = concreteMat;
-  mkWall(scene, collidables, 2, 1.2, 0.5, pm, -3.0, 7.6, -4.75);
-  mkWall(scene, collidables, 2, 1.2, 0.5, pm, 3.0, 7.6, -4.75);
-  mkWall(scene, collidables, 2, 1.2, 0.5, pm, -3.0, 7.6, 4.75);
-  mkWall(scene, collidables, 2, 1.2, 0.5, pm, 3.0, 7.6, 4.75);
-  mkWall(scene, collidables, 0.5, 1.2, 2, pm, -4.75, 7.6, -3.0);
-  mkWall(scene, collidables, 0.5, 1.2, 2, pm, -4.75, 7.6, 3.0);
-  mkWall(scene, collidables, 0.5, 1.2, 2, pm, 4.75, 7.6, -3.0);
-  mkWall(scene, collidables, 0.5, 1.2, 2, pm, 4.75, 7.6, 3.0);
+  // Tower parapets
+  mkWall(scene, collidables, 2, 1.2, 0.5, t.cover, -3.0, 7.6, -4.75);
+  mkWall(scene, collidables, 2, 1.2, 0.5, t.cover, 3.0, 7.6, -4.75);
+  mkWall(scene, collidables, 2, 1.2, 0.5, t.cover, -3.0, 7.6, 4.75);
+  mkWall(scene, collidables, 2, 1.2, 0.5, t.cover, 3.0, 7.6, 4.75);
+  mkWall(scene, collidables, 0.5, 1.2, 2, t.cover, -4.75, 7.6, -3.0);
+  mkWall(scene, collidables, 0.5, 1.2, 2, t.cover, -4.75, 7.6, 3.0);
+  mkWall(scene, collidables, 0.5, 1.2, 2, t.cover, 4.75, 7.6, -3.0);
+  mkWall(scene, collidables, 0.5, 1.2, 2, t.cover, 4.75, 7.6, 3.0);
 
-  // Corner pillars — metal
-  mkWall(scene, collidables, 0.8, 4, 0.8, metalMat, -4.5, 9.0, -4.5);
-  mkWall(scene, collidables, 0.8, 4, 0.8, metalMat, 4.5, 9.0, -4.5);
-  mkWall(scene, collidables, 0.8, 4, 0.8, metalMat, -4.5, 9.0, 4.5);
-  mkWall(scene, collidables, 0.8, 4, 0.8, metalMat, 4.5, 9.0, 4.5);
+  // Corner pillars
+  mkWall(scene, collidables, 0.8, 4, 0.8, t.metal, -4.5, 9.0, -4.5);
+  mkWall(scene, collidables, 0.8, 4, 0.8, t.metal, 4.5, 9.0, -4.5);
+  mkWall(scene, collidables, 0.8, 4, 0.8, t.metal, -4.5, 9.0, 4.5);
+  mkWall(scene, collidables, 0.8, 4, 0.8, t.metal, 4.5, 9.0, 4.5);
 
-  // Roof — metal
-  mkWall(scene, collidables, 11, 0.4, 11, metalMat, 0, 11.2, 0);
+  // Roof
+  mkWall(scene, collidables, 11, 0.4, 11, t.metal, 0, 11.2, 0);
 
   // Metal ladders
   mkLadder(scene, collidables, 1.5, 7.5, 0, 3.75, -5.05, 0);
@@ -249,57 +279,191 @@ export function buildMap(scene, collidables, theme = 'desert') {
   mkLadder(scene, collidables, 1.5, 7.5, -5.05, 3.75, 0, -Math.PI / 2);
   mkLadder(scene, collidables, 1.5, 7.5, 5.05, 3.75, 0, Math.PI / 2);
 
-  // ── Corridor cover — concrete barriers ──
-  mkWall(scene, collidables, 2, 2.5, 16, concreteMat, -18, 1.25, -9.5);
-  mkWall(scene, collidables, 2, 2.5, 16, concreteMat, -18, 1.25, 9.5);
-  mkWall(scene, collidables, 2, 2.5, 16, concreteMat, 18, 1.25, -9.5);
-  mkWall(scene, collidables, 2, 2.5, 16, concreteMat, 18, 1.25, 9.5);
+  // Corridor cover
+  mkWall(scene, collidables, 2, 2.5, 16, t.cover, -18, 1.25, -9.5);
+  mkWall(scene, collidables, 2, 2.5, 16, t.cover, -18, 1.25, 9.5);
+  mkWall(scene, collidables, 2, 2.5, 16, t.cover, 18, 1.25, -9.5);
+  mkWall(scene, collidables, 2, 2.5, 16, t.cover, 18, 1.25, 9.5);
 
-  // ── Corner bunkers — brick walls ──
+  // Corner bunkers
   const corners = [[-30, -30], [30, -30], [-30, 30], [30, 30]];
   corners.forEach(([cx, cz]) => {
-    mkWall(scene, collidables, 6, 3, 1.5, brickMat, cx, 1.5, cz);
-    mkWall(scene, collidables, 1.5, 3, 6, brickMat, cx, 1.5, cz);
-    // Window slot on top
-    mkBox(scene, 4.5, 0.5, 1.2, concreteMat, cx, 3.25, cz, true);
+    mkWall(scene, collidables, 6, 3, 1.5, t.wall, cx, 1.5, cz);
+    mkWall(scene, collidables, 1.5, 3, 6, t.wall, cx, 1.5, cz);
+    mkBox(scene, 4.5, 0.5, 1.2, t.cover, cx, 3.25, cz, true);
   });
 
-  // ── Mid-lane cover — sandbag barriers ──
+  // Mid-lane cover
   const coverPositions = [
     [-12, -12], [12, -12], [-12, 12], [12, 12],
     [-25, 0], [25, 0], [0, -25], [0, 25],
     [-25, -20], [25, -20], [-25, 20], [25, 20],
   ];
   coverPositions.forEach(([cx, cz]) => {
-    mkWall(scene, collidables, 3, 1.8, 3, concreteMat, cx, 0.9, cz);
+    mkWall(scene, collidables, 3, 1.8, 3, t.cover, cx, 0.9, cz);
   });
 
-  // ── Site platforms — concrete ──
-  mkWall(scene, collidables, 12, 1, 12, concreteMat, -28, 0.5, -28);
-  mkWall(scene, collidables, 12, 1, 12, concreteMat, 28, 0.5, 28);
+  // Site platforms
+  mkWall(scene, collidables, 12, 1, 12, t.cover, -28, 0.5, -28);
+  mkWall(scene, collidables, 12, 1, 12, t.cover, 28, 0.5, 28);
 
-  // Platform pillars — concrete
+  // Platform pillars
   [-28, 28].forEach(px => [-28, 28].forEach(pz =>
-    mkWall(scene, collidables, 1.5, 4, 1.5, concreteMat, px, 2, pz)
+    mkWall(scene, collidables, 1.5, 4, 1.5, t.cover, px, 2, pz)
   ));
 
-  // ── Ground detail — scattered crates ──
-  const crateMat = woodMat;
-  [[-8, -32], [15, -35], [-22, 8], [32, -8], [-35, -15]].forEach(([cx, cz]) => {
-    const crate = mkBox(scene, 1.2, 1.2, 1.2, crateMat, cx, 0.6, cz);
-    crate.rotation.y = Math.random() * 0.5;
-  });
+  // ── Theme-specific props ──
+  if (theme === 'bind') {
+    // ─── BIND: Radiant Crates (orange body, glowing teal edges) ───
+    const cratePositions = [[-8,-32],[15,-35],[-22,8],[32,-8],[-35,-15],[10,30],[-10,28]];
+    cratePositions.forEach(([cx, cz]) => {
+      const grp = new THREE.Group();
+      // Orange body
+      const body = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), t.crate);
+      body.castShadow = true; body.receiveShadow = true;
+      grp.add(body);
+      // Teal edge strips (4 vertical edges)
+      const edgeGeo = new THREE.BoxGeometry(0.06, 1.24, 0.06);
+      [[-0.6,-0.6],[0.6,-0.6],[-0.6,0.6],[0.6,0.6]].forEach(([ex,ez]) => {
+        const edge = new THREE.Mesh(edgeGeo, t.crateEdge);
+        edge.position.set(ex, 0, ez);
+        grp.add(edge);
+      });
+      grp.position.set(cx, 0.6, cz);
+      grp.rotation.y = Math.random() * 0.5;
+      scene.add(grp);
+    });
 
-  // ── Ground markings / faded paint lines ──
+    // Sandy barriers (low sand-colored walls)
+    const barrierMat = new THREE.MeshStandardMaterial({ color: 0xc8b070, roughness: 0.95 });
+    [[-15, -20, 4], [15, 20, 4], [-20, 15, 3], [20, -15, 3]].forEach(([bx, bz, bw]) => {
+      const barrier = mkWall(scene, collidables, bw, 1.2, 1.0, barrierMat, bx, 0.6, bz);
+      // Sandbag texture bumps
+      for (let i = 0; i < 3; i++) {
+        const bump = new THREE.Mesh(
+          new THREE.SphereGeometry(0.25, 6, 4),
+          barrierMat
+        );
+        bump.position.set(bx + (i - 1) * 0.6, 1.3, bz);
+        bump.scale.set(1, 0.6, 0.8);
+        bump.castShadow = true;
+        scene.add(bump);
+      }
+    });
+
+  } else {
+    // ─── INFERNO: Stone Pillars + Wooden Archways ───
+    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x8a8070, roughness: 0.85 });
+    const pillarPositions = [[-8,-32],[15,-35],[-22,8],[32,-8],[-35,-15]];
+    pillarPositions.forEach(([px, pz]) => {
+      // Stone pillar (cylinder)
+      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 3.5, 10), pillarMat);
+      pillar.position.set(px, 1.75, pz);
+      pillar.castShadow = true; pillar.receiveShadow = true;
+      scene.add(pillar);
+      // Pillar base (wider disc)
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.75, 0.3, 10), pillarMat);
+      base.position.set(px, 0.15, pz);
+      base.castShadow = true;
+      scene.add(base);
+      // Pillar capital
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.5, 0.25, 10), pillarMat);
+      cap.position.set(px, 3.6, pz);
+      cap.castShadow = true;
+      scene.add(cap);
+    });
+
+    // Wooden archways between paired pillars
+    const archWoodMat = t.wood;
+    // Arch between pillar 0 and 1
+    [[ [-8,-32], [15,-35] ], [ [-22,8], [-35,-15] ]].forEach(([[ax,az],[bx2,bz2]]) => {
+      const mx = (ax + bx2) / 2, mz = (az + bz2) / 2;
+      const dx = bx2 - ax, dz = bz2 - az;
+      const len = Math.sqrt(dx*dx + dz*dz);
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(len, 0.3, 0.4), archWoodMat);
+      beam.position.set(mx, 3.75, mz);
+      beam.rotation.y = Math.atan2(dz, dx);
+      beam.castShadow = true;
+      scene.add(beam);
+    });
+
+    // Wooden crates (Inferno style — plain wood)
+    [[10,30],[-10,28],[25,15]].forEach(([cx, cz]) => {
+      const crate = mkBox(scene, 1.2, 1.2, 1.2, t.wood, cx, 0.6, cz);
+      crate.rotation.y = Math.random() * 0.5;
+    });
+  }
+
+  // ── Ground markings — paint lines ──
   const lineMat = new THREE.MeshStandardMaterial({
-    color: 0xccbb88, roughness: 1, transparent: true, opacity: 0.25
+    color: theme === 'inferno' ? 0xa09878 : 0xccbb88,
+    roughness: 1, transparent: true, opacity: 0.25
   });
-  [[-10, 0, 0.5, 0.02, 20], [10, 0, 0.5, 0.02, 20], [0, -10, 20, 0.02, 0.5], [0, 10, 20, 0.02, 0.5]].forEach(([x, z, w, h, d]) => {
+  [[-10,0,0.5,0.02,20],[10,0,0.5,0.02,20],[0,-10,20,0.02,0.5],[0,10,20,0.02,0.5]].forEach(([x,z,w,h,d]) => {
     const line = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), lineMat);
     line.position.set(x, 0.015, z);
     line.receiveShadow = true;
     scene.add(line);
   });
 
-  return { sandMat, brickMat, concreteMat, metalMat, woodMat };
+  // ── Tactical Buddy — a cute rounded robot sitting on cover ──
+  buildTacticalBuddy(scene, theme);
+
+  // Pickups
+  buildPickups(scene);
 }
+
+// ── TACTICAL BUDDY — cute low-poly robot companion ──
+function buildTacticalBuddy(scene, theme) {
+  const buddy = new THREE.Group();
+
+  const bodyColor = theme === 'inferno' ? 0x887766 : 0x88bbcc;
+  const eyeColor = theme === 'inferno' ? 0xff8844 : 0x44ffcc;
+  const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.4, metalness: 0.3 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: eyeColor, emissive: eyeColor, emissiveIntensity: 0.6, roughness: 0.2 });
+  const accentMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5, metalness: 0.2 });
+
+  // Round body (sphere)
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.45, 12, 12), bodyMat);
+  body.position.y = 0.45;
+  body.castShadow = true;
+  buddy.add(body);
+
+  // Flat bottom (so it sits nicely)
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.38, 0.15, 10), bodyMat);
+  base.position.y = 0.07;
+  buddy.add(base);
+
+  // Eyes (two small glowing spheres)
+  const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), eyeMat);
+  eyeL.position.set(-0.15, 0.55, 0.38);
+  buddy.add(eyeL);
+  const eyeR = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), eyeMat);
+  eyeR.position.set(0.15, 0.55, 0.38);
+  buddy.add(eyeR);
+
+  // Antenna
+  const antennaPole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.25, 6), accentMat);
+  antennaPole.position.set(0, 0.95, 0);
+  buddy.add(antennaPole);
+  const antennaBall = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMat);
+  antennaBall.position.set(0, 1.1, 0);
+  buddy.add(antennaBall);
+
+  // Little arm stubs
+  const armMat = bodyMat;
+  const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.18, 4, 6), armMat);
+  armL.position.set(-0.48, 0.4, 0);
+  armL.rotation.z = 0.4;
+  buddy.add(armL);
+  const armR = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.18, 4, 6), armMat);
+  armR.position.set(0.48, 0.4, 0);
+  armR.rotation.z = -0.4;
+  buddy.add(armR);
+
+  // Place on a mid-lane cover block
+  buddy.position.set(12, 1.8, 12);
+  buddy.userData.isBuddy = true;
+  scene.add(buddy);
+}
+

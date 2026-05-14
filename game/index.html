@@ -14,6 +14,12 @@
   }
 }
 </script>
+<script>
+  // Ensure trailing slash for correct relative path resolution
+  if (window.location.pathname.endsWith('/game')) {
+    window.location.pathname += '/';
+  }
+</script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:#0a0a0a;overflow:hidden;font-family:'Rajdhani',sans-serif;color:#fff;user-select:none;}
@@ -173,6 +179,24 @@ input[type=checkbox]{width:19px;height:19px;accent-color:#e74c3c;cursor:pointer;
 
 /* Menu title */
 .menu-title{color:#e67e22;text-shadow:0 0 30px rgba(230,126,34,.4),0 2px 10px rgba(0,0,0,.8);}
+
+/* Level title overlay */
+#level-title{
+  position:absolute;top:8%;left:50%;transform:translateX(-50%);
+  font-family:'Oswald',sans-serif;font-size:2rem;font-weight:700;
+  letter-spacing:4px;text-transform:uppercase;color:#e67e22;
+  text-shadow:0 0 20px rgba(230,126,34,.5),0 2px 6px rgba(0,0,0,.8);
+  transition:opacity 1s ease-out;pointer-events:none;z-index:65;
+}
+
+/* Level select */
+#level-select{
+  background:rgba(255,255,255,.1);color:#e67e22;border:1px solid rgba(255,255,255,.15);
+  border-radius:4px;padding:6px 12px;font-family:'Rajdhani',sans-serif;
+  font-size:.9rem;font-weight:600;letter-spacing:1px;cursor:pointer;
+  margin-top:10px;outline:none;
+}
+#level-select option{background:#1a1a1a;color:#fff;}
 </style>
 </head>
 <body>
@@ -183,6 +207,7 @@ input[type=checkbox]{width:19px;height:19px;accent-color:#e74c3c;cursor:pointer;
 
 <!-- HUD -->
 <div id="hud" class="hidden">
+  <div id="level-title" style="opacity:0"></div>
   <div id="kill-streak-container">
     <h1 id="kill-streak-text">DOUBLE KILL</h1>
     <p id="kill-streak-sub">STREAK +2</p>
@@ -215,7 +240,19 @@ input[type=checkbox]{width:19px;height:19px;accent-color:#e74c3c;cursor:pointer;
 <!-- MAIN MENU -->
 <div id="menu" class="screen">
   <h1 class="menu-title">⚔ Tactical Aim Arena</h1>
-  <h2>DESERT COMPOUND — ELIMINATE ALL HOSTILES</h2>
+  <h2>BIND × INFERNO — ELIMINATE ALL HOSTILES</h2>
+  <select id="level-select">
+    <option value="0">Level 1 — Bind: Recon (10 hostiles)</option>
+    <option value="1">Level 2 — Bind: Breach (12 hostiles)</option>
+    <option value="2">Level 3 — Bind: Assault (14 hostiles)</option>
+    <option value="3">Level 4 — Bind: Siege (16 hostiles)</option>
+    <option value="4">Level 5 — Bind: Lockdown (18 hostiles)</option>
+    <option value="5">Level 6 — Inferno: Recon (20 hostiles)</option>
+    <option value="6">Level 7 — Inferno: Breach (22 hostiles)</option>
+    <option value="7">Level 8 — Inferno: Assault (25 hostiles)</option>
+    <option value="8">Level 9 — Inferno: Siege (28 hostiles)</option>
+    <option value="9">Level 10 — Inferno: Last Stand (30 hostiles)</option>
+  </select>
   <button class="btn btn-red" id="btn-start">▶ Start Mission</button>
   <button class="btn btn-blue" id="btn-cfg">⚙ Settings</button>
   <p class="hint">WASD · SPACE · LMB · R · Keys 1/2 · ESC to pause</p>

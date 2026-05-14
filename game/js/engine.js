@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { buildMap, buildDustParticles, updateDust } from './map.js';
+import { buildMap, buildDustParticles, updateDust, updatePickups, checkPickup, hidePickup, resetPickups } from './map.js';
 import { buildWeaponMesh, updateWeaponAnim, applyRecoilAnim, getMuzzleWorldPos } from './weapons.js';
 import { spawnEnemies, animateDeath } from './soldiers.js';
 import { VFXSystem, spawnTracer, updateTracers, clearTracers, spawnBloodPool, clearBloodPools,
@@ -28,19 +28,19 @@ let wpnMesh = null;
 let dustPts = null;
 let vfx = null;
 let postfx = null;
+let currentLevel = 0;
 
-// Level configurations (placeholder themes for 10 levels)
 const LEVEL_CONFIG = [
-  { level: 1, theme: 'desert' },
-  { level: 2, theme: 'desert' },
-  { level: 3, theme: 'desert' },
-  { level: 4, theme: 'desert' },
-  { level: 5, theme: 'desert' },
-  { level: 6, theme: 'desert' },
-  { level: 7, theme: 'desert' },
-  { level: 8, theme: 'desert' },
-  { level: 9, theme: 'desert' },
-  { level: 10, theme: 'desert' },
+  { level:1,  theme:'bind',    title:'Bind — Recon',         enemies:10 },
+  { level:2,  theme:'bind',    title:'Bind — Breach',        enemies:12 },
+  { level:3,  theme:'bind',    title:'Bind — Assault',       enemies:14 },
+  { level:4,  theme:'bind',    title:'Bind — Siege',         enemies:16 },
+  { level:5,  theme:'bind',    title:'Bind — Lockdown',      enemies:18 },
+  { level:6,  theme:'inferno', title:'Inferno — Recon',      enemies:20 },
+  { level:7,  theme:'inferno', title:'Inferno — Breach',     enemies:22 },
+  { level:8,  theme:'inferno', title:'Inferno — Assault',    enemies:25 },
+  { level:9,  theme:'inferno', title:'Inferno — Siege',      enemies:28 },
+  { level:10, theme:'inferno', title:'Inferno — Last Stand', enemies:30 },
 ];
 
 // Recoil
@@ -72,14 +72,13 @@ export function init() {
   renderer.toneMappingExposure = 1.6;
 
   scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0xc8b898, 0.012);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
   clock = new THREE.Clock();
   raycaster = new THREE.Raycaster();
 
   controls = new PointerLockControls(camera, document.body);
-  scene.add(controls.getObject());
+  scene.add(controls.object);
 
   // Lighting
   const hemi = new THREE.HemisphereLight(0xffffff, 0xffffff, 1.4);
@@ -101,14 +100,6 @@ export function init() {
   const fill = new THREE.DirectionalLight(0xffffff, 0.8);
   fill.position.set(-15, 20, -15);
   scene.add(fill);
-
-  // Build map (default theme for level 1)
-  collidables = [];
-  buildMap(scene, collidables, LEVEL_CONFIG[0].theme);
-  dustPts = buildDustParticles(scene);
-
-  // VFX
-  vfx = new VFXSystem(scene);
 
   // Post-processing
   postfx = setupPostProcessing(renderer, scene, camera);
@@ -186,7 +177,15 @@ export function init() {
   bindBtn('btn-cfg',   () => showScreen($('cfg')));
   bindBtn('btn-back',  () => showScreen($('menu')));
   bindBtn('btn-go-retry',  () => startGame());
-  bindBtn('btn-win-retry', () => startGame());
+  bindBtn('btn-win-retry', () => nextLevel());
+
+  // Level select dropdown
+  const levelSel = $('level-select');
+  if (levelSel) {
+    levelSel.addEventListener('change', function() {
+      currentLevel = parseInt(this.value, 10);
+    });
+  }
   bindBtn('btn-resume', () => {
     showScreen($('hud'));
     $('vignette').classList.remove('hidden');
@@ -235,11 +234,30 @@ function showScreen(el) {
 }
 
 // ── GAME START/RESET ──
-function resetGame() {
+function clearScene() {
   enemies.forEach(e => scene.remove(e.group));
   clearBloodPools(scene);
   clearTracers(scene);
   dyingEnemies = [];
+  // Remove all non-essential objects (keep camera, lights)
+  const keep = new Set();
+  scene.traverse(o => { if (o.isLight || o === controls.object) keep.add(o); });
+  const toRemove = [];
+  scene.children.forEach(c => { if (!keep.has(c) && !c.isLight) toRemove.push(c); });
+  toRemove.forEach(c => scene.remove(c));
+  collidables.length = 0;
+}
+
+function resetGame() {
+  clearScene();
+
+  const lvl = LEVEL_CONFIG[currentLevel] || LEVEL_CONFIG[0];
+
+  // Rebuild map for current level theme
+  buildMap(scene, collidables, lvl.theme);
+  if (dustPts) scene.remove(dustPts);
+  dustPts = buildDustParticles(scene, lvl.theme);
+  resetPickups();
 
   player.hp = 100;
   player.vel.set(0, 0, 0);
@@ -266,25 +284,44 @@ function resetGame() {
   lastKillTime = 0;
   pentakillCooldown = 0;
 
-  controls.getObject().position.set(0, PLAYER_HEIGHT, 18);
+  controls.object.position.set(0, PLAYER_HEIGHT, 18);
   if (wpnMesh) { camera.remove(wpnMesh); wpnMesh = null; }
   wpnMesh = buildWeaponMesh(camera, player.weapon);
 
-  const spawned = spawnEnemies(scene, ENEMY_TOTAL);
+  const enemyCount = lvl.enemies || ENEMY_TOTAL;
+  const spawned = spawnEnemies(scene, enemyCount, lvl.theme);
   enemies = spawned.enemies;
   enemyMeshes = spawned.enemyMeshes;
+
+  // VFX system re-init
+  if (vfx) vfx.dispose();
+  vfx = new VFXSystem(scene);
 
   updateHealthHUD();
   updateWeaponHUD();
   updateAccHUD();
   updateKillHUD();
   $('wpn-reload').textContent = '';
-  // Clear kill feed
   const kf = $('kill-feed');
   if (kf) kf.innerHTML = '';
+
+  // Level title HUD
+  const lt = $('level-title');
+  if (lt) {
+    lt.textContent = `Level ${lvl.level}: ${lvl.title}`;
+    lt.style.opacity = '1';
+    setTimeout(() => { lt.style.opacity = '0'; }, 3000);
+  }
+  // Sync level-select dropdown
+  const sel = $('level-select');
+  if (sel) sel.value = currentLevel;
+  // Update hostiles counter
+  const hb = $('kills-box');
+  if (hb) hb.innerHTML = `HOSTILES <span id="h-enemies">${enemyCount}</span>/${enemyCount}`;
 }
 
-function startGame() {
+function startGame(level) {
+  if (level !== undefined) currentLevel = level;
   resetGame();
   showScreen($('hud'));
   $('vignette').classList.remove('hidden');
@@ -293,8 +330,6 @@ function startGame() {
   else {
     gameActive = true;
     gameActiveRef.value = true;
-    
-    // Request fullscreen and horizontal orientation
     if (document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().then(() => {
         if (screen.orientation && screen.orientation.lock) {
@@ -304,6 +339,21 @@ function startGame() {
     }
   }
 }
+
+function nextLevel() {
+  if (currentLevel < LEVEL_CONFIG.length - 1) {
+    currentLevel++;
+    startGame(currentLevel);
+  } else {
+    // All 10 levels complete!
+    currentLevel = 0;
+    resetGame();
+    showScreen($('menu'));
+    $('vignette').classList.add('hidden');
+    playMenuMusic();
+  }
+}
+
 
 // ── SHOOTING ──
 function tryShoot() {
@@ -530,7 +580,7 @@ function updateKillHUD() {
 
 // ── COLLISION ──
 function resolveCollisions() {
-  const pos = controls.getObject().position;
+  const pos = controls.object.position;
   player.onLadder = false;
   pos.x = THREE.MathUtils.clamp(pos.x, -39, 39);
   pos.z = THREE.MathUtils.clamp(pos.z, -39, 39);
@@ -569,7 +619,7 @@ function resolveCollisions() {
 const _dir = new THREE.Vector3();
 
 function updateEnemies(dt) {
-  const pPos = controls.getObject().position;
+  const pPos = controls.object.position;
   for (const e of enemies) {
     if (!e.alive) continue;
     _dir.subVectors(pPos, e.group.position);
@@ -630,7 +680,7 @@ const _UP = new THREE.Vector3(0, 1, 0);
 
 function updatePlayer(dt) {
   if (!isMobile && !controls.isLocked) return;
-  const obj = controls.getObject();
+  const obj = controls.object;
 
   // Mobile Look
   if (isMobile) {
@@ -751,18 +801,32 @@ function loop() {
   if (gameActive) {
     updatePlayer(dt);
     updateEnemies(dt);
+
+    // Pickup animations & collection
+    updatePickups(dt);
+    const pPos = controls.object.position;
+    const pickup = checkPickup(pPos, player.hp, player.ammo);
+    if (pickup === 'health' && player.hp < 100) {
+      player.hp = Math.min(100, player.hp + 30);
+      updateHealthHUD();
+      hidePickup('health');
+    } else if (pickup === 'ammo') {
+      player.ammo.ak47.reserve += 30;
+      player.ammo.pistol.reserve += 12;
+      updateWeaponHUD();
+      hidePickup('ammo');
+    }
   }
 
   // Death animations
   for (let i = dyingEnemies.length - 1; i >= 0; i--) {
-    // Pass the current scene to animateDeath so it can remove the mesh
     if (animateDeath(dyingEnemies[i], dt, scene)) {
       dyingEnemies.splice(i, 1);
     }
   }
 
   // VFX
-  vfx.update(dt);
+  if (vfx) vfx.update(dt);
   updateTracers(scene, dt);
   updateDust(dustPts, dt);
 

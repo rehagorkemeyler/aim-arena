@@ -39,8 +39,8 @@ export const BODY_DMG = 34;
 export const HEAD_DMG = 100;
 
 export const WPN = {
-  ak47:   { name: 'AK-47',  mag: 30, reserve: 90,  auto: true,  rpm: 600, reloadSec: 2.4 },
-  pistol: { name: 'Deagle', mag: 12, reserve: 60,  auto: false, rpm: 280, reloadSec: 1.6 },
+  ak47: { name: 'AK-47', mag: 30, reserve: 90, auto: true, rpm: 600, reloadSec: 2.4 },
+  pistol: { name: 'Deagle', mag: 12, reserve: 60, auto: false, rpm: 280, reloadSec: 1.6 },
 };
 
 // Callbacks set by engine
